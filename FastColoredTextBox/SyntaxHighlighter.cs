@@ -22,6 +22,9 @@ namespace FastColoredTextBoxNS
         public readonly Style MaroonStyle = new TextStyle(Brushes.Maroon, null, FontStyle.Regular);
         public readonly Style RedStyle = new TextStyle(Brushes.Red, null, FontStyle.Regular);
         public readonly Style BlackStyle = new TextStyle(Brushes.Black, null, FontStyle.Regular);
+        public readonly Style CrimsonStyle = new TextStyle(Brushes.Crimson, null, FontStyle.Regular);
+        public readonly Style DarkOrangeStyle = new TextStyle(Brushes.DarkOrange, null, FontStyle.Regular);
+        public readonly Style DodgerBlueStyle = new TextStyle(Brushes.DodgerBlue, null, FontStyle.Regular);        
         //
         protected readonly Dictionary<string, SyntaxDescriptor> descByXMLfileNames =
             new Dictionary<string, SyntaxDescriptor>();
@@ -87,6 +90,17 @@ namespace FastColoredTextBoxNS
         protected Regex LuaNumberRegex;
         protected Regex LuaStringRegex;
         protected Regex LuaFunctionsRegex;
+
+        protected Regex PythonCommentRegex;
+
+        protected Regex PythonKeywordRegex;
+        protected Regex PythonNumberRegex;
+        protected Regex PythonStringRegex1;
+        protected Regex PythonStringRegex2;
+
+        public Regex RazorClassKeywordRegex;
+        public Regex RazorPropsKeywordRegex;
+        public Regex RazorFunctionsKeywordRegex;
 
         protected Regex PHPCommentRegex1,
                       PHPCommentRegex2,
@@ -179,6 +193,9 @@ namespace FastColoredTextBoxNS
                 case Language.JSON:
                     JSONSyntaxHighlight(range);
                     break;
+                case Language.Python:
+                    PythonSyntaxHighlight(range);
+                    break;
                 default:
                     break;
             }
@@ -234,6 +251,9 @@ namespace FastColoredTextBoxNS
                     break; //JS like C#
                 case Language.Lua:
                     LuaAutoIndentNeeded(sender, args);
+                    break;
+                case Language.Python:                    
+                    PythonAutoIndentNeeded(sender, args);
                     break;
                 default:
                     break;
@@ -668,6 +688,16 @@ namespace FastColoredTextBoxNS
                     NumberStyle = MagentaStyle;
                     KeywordStyle = BlueBoldStyle;
                     FunctionsStyle = MaroonStyle;
+                    break;
+                case Language.Python:
+                    StringStyle = MagentaStyle;
+                    CommentStyle = GreenStyle;
+                    NumberStyle = BrownStyle;
+                    KeywordStyle = BlueStyle;
+                    FunctionsStyle = RedStyle;
+                    RazorClassKeywordStyle = CrimsonStyle;
+                    RazorPropsKeywordStyle = DarkOrangeStyle;
+                    RazorFunctionsKeywordStyle = DodgerBlueStyle;
                     break;
                 case Language.PHP:
                     StringStyle = RedStyle;
@@ -1301,6 +1331,97 @@ namespace FastColoredTextBoxNS
                 return;
             }
         }
+        protected void InitPythonRegex() {
+            PythonStringRegex1 = new Regex("\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"", RegexCompiledOption);
+            PythonStringRegex2 = new Regex("'[^'\\\\]*(\\\\.[^'\\\\]*)*'", RegexCompiledOption);
+
+            PythonCommentRegex = LuaCommentRegex1 = new Regex(@"#.*$", RegexOptions.Multiline | RegexCompiledOption);
+
+            PythonNumberRegex = new Regex(@"\b[+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\b", RegexCompiledOption);
+            PythonKeywordRegex = new Regex(@"\b(and|assert|break|class|continue|def|del|elif|else|except|exec|finally|for|from|global|if|import|in|is|lambda|not|or|pass|print|raise|return|try|while|yield|None|True|False|as)\b", RegexCompiledOption);
+
+            RazorClassKeywordRegex = new Regex(@"\b(Player|Spells|Mobile|Mobiles|Item|Items|Misc|Target|Gumps|Journal|AutoLoot|Scavenger|Organizer|Restock|SellAgent|BuyAgent|Dress|Friend|BandageHeal|Statics|DPSMeter|PathFinding|Timer|Vendor)\b", RegexCompiledOption);
+
+            string GenericProps = "Serial|Hue|Position|X|Y|Z|Contains|Weight";
+            string PlayerProps = "Str|Int|Dex|StatCap|AR|FireResistance|ColdResistance|EnergyResistance|PoisonResistance|Buffs|IsGhost|Gold|Luck|Followers|FollowersMax|MaxWeight|HasSpecial|Flying|StaticMount";
+            string MobileProps = "Name|Body|MobileID|Color|Direction|Visible|Poisoned|YellowHits|Paralized|Human|WarMode|Female|Hits|HitsMax|Stam|StamMax|Mana|ManaMax|Backpack|Mount|Quiver|Notoriety|Map|InParty|Properties|Flying";
+            string ItemsProps = "Amount|IsBagOfSending|IsContainer|IsCorpse|IsDoor|IsInBank|Movable|OnGround|ItemID|RootContainer|Container|Durability|MaxDurability";
+            string StaticProps = "StaticID|StaticHue|StaticZ";
+            string ItemFilterProps = "Enabled|Graphics|Hues|RangeMin|RangeMax|Layers|Serials";
+            string MobileFilterProps = "Bodies|Notorieties|CheckIgnoreObject|CheckLineOfSite";
+            string PathFindProps = "DebugMessage|StopIfStuck|MaxRetry";
+            RazorPropsKeywordRegex = new Regex(String.Format(@"\b({0}|{1}|{2}|{3}|{4}|{5}|{6}|{7})\b", GenericProps, PlayerProps, MobileProps, ItemsProps, StaticProps, ItemFilterProps, MobileFilterProps, PathFindProps), RegexCompiledOption);
+
+            string GenericFunctions = "GetItemOnLayer|GetAssistantLayer|FindBySerial|Filter|ApplyFilter|Select|SingleClick|WaitForProps|SumAttribute|GetPropValue|GetPropStringByIndex|GetPropStringList|Message";
+            string PlayerFunctions = "BuffsExist|GetBuffDescription|HeadMessage|InRangeMobile|InRangeItem|UnEquipItemByLayer|EquipItem|CheckLayer|GetSkillValue|GetSkillCap|GetSkillStatus|GetRealSkillValue|UseSkill|ChatSay|MapSay|ChatEmote|ChatWhisper|ChatYell|ChatGuild|ChatAlliance|SetWarMode|Attack|AttackLast|InParty|ChatParty|PartyCanLoot|PartyInvite|PartyAccept|PartyLeave|KickMember|InvokeVirtue|Walk|Run|PathFindTo|QuestButton|GuildButton|WeaponPrimarySA|WeaponSecondarySA|WeaponClearSA|WeaponStunSA|WeaponDisarmSA|Fly|ChatChannel|EquipUO3D|SpellIsEnabled|SetSkillStatus|SetStatStatus|ToggleAlwaysRun";
+
+            string SpellsFunctions = "CastMagery|CastNecro|CastChivalry|CastBushido|CastNinjitsu|CastSpellweaving|CastMysticism|CastCleric|CastDruid|CastMastery|Interrupt|CastLastSpell|CastLastSpell";
+            string MobileFunctions = "UseMobile|ContextExist|WaitForStats|GetTrackingInfo";
+            string ItemsFunctions = "DistanceTo|Move|MoveOnGround|DropItemGroundSelf|UseItem|WaitForContents|BackpackCount|ContainerCount|GetPropByCliloc|GetPropByString|UseItemByID|Hide|ContextExist|FindByID";
+            string MiscFunctions = "SendMessage|SendToClient|Resync|Pause|Beep|Disconnect|WaitForContext|ContextReply|ResetPrompt|HasPrompt|WaitForPrompt|CancelPrompt|ResponsePrompt|MouseMove|MouseLocation|ReadSharedValue|RemoveSharedValue|CheckSharedValue|SetSharedValue|HasMenu|CloseMenu|MenuContain|GetMenuTitle|WaitForMenu|MenuResponse|HasQueryString|WaitForQueryString|QueryStringResponse|NoOperation|ScriptRun|ScriptStop|ScriptStatus|PetRename|FocusUOWindow|ClearIgnore|CheckIgnoreObject|IgnoreObject|UnIgnoreObject|ScriptStopAll|ShardName|CaptureNow|GetMapInfo|CloseBackpack|NextContPosition|GetContPosition";
+            string TargetFunctions = "HasTarget|GetLast|GetLastAttack|WaitForTarget|TargetExecute|Cancel|Last|LastQueued|Self|SelfQueued|SetLast|ClearLast|ClearQueue|ClearLastandQueue|SetLastTargetFromList|PerformTargetFromList|AttackTargetFromList|PromptGroundTarget|PromptTarget|TargetExecuteRelative|GetTargetFromList";
+            string GumpsFunctions = "CurrentGump|HasGump|CloseGump|ResetGump|WaitForGump|SendAction|SendAdvancedAction|LastGump|LastGumpGetLineList|LastGumpTextExist|LastGumpTextExistByLine|LastGumpRawData";
+            string JournalFunctions = "Clear|Search|SearchByName|SearchByColor|SearchByType|GetLineText|GetSpeechName|WaitJournal|WaitByName|GetTextBySerial|GetTextByColor|GetTextByName|GetTextByType";
+            string AgentsFunctions = "Status|Start|Stop|FStart|FStop|ChangeList|RunOnce|Enable|Disable|IsFriend|Pause|GetDamage|GetList";
+            string DressUndressAgentFunctions = "DressStatus|UnDressStatus|DressFStart|UnDressFStart|DressFStop|UnDressFStop";
+            string StaticsFunctions = "GetLandID|GetLandZ|GetStaticsTileInfo|GetTileFlag|GetLandFlag|GetStaticsLandInfo|CheckDeedHouse|GetLandName|GetTileName";
+            string PathFindingFunctions = "Route|Go|Tile|GetPath|RunPath";
+            string TimerFunctions = "Check|Create";
+            string VendorFunctions = "Buy";
+            RazorFunctionsKeywordRegex = new Regex(String.Format(@"\b({0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}|{9}|{10}|{11}|{12}|{13}|{14})\b",
+                GenericFunctions, PlayerFunctions, SpellsFunctions, MobileFunctions, ItemsFunctions, MiscFunctions, TargetFunctions, JournalFunctions, GumpsFunctions, AgentsFunctions, DressUndressAgentFunctions, StaticsFunctions, PathFindingFunctions, TimerFunctions, VendorFunctions), RegexCompiledOption);
+        }
+        /// <summary>
+        /// Highlights Lua code
+        /// </summary>
+        /// <param name="range"></param>
+        public virtual void PythonSyntaxHighlight(Range range) {
+            range.tb.CommentPrefix = "#";
+
+            range.tb.LeftBracket = '(';
+            range.tb.RightBracket = ')';
+            range.tb.LeftBracket2 = '[';
+            range.tb.RightBracket2 = ']';
+            range.tb.BracketsHighlightStrategy = BracketsHighlightStrategy.Strategy1;
+
+            //range.tb.AutoIndentCharsPatterns = @"^\s*[\w\.]+(\s\w+)?\s*(?<range>=)\s*(?<range>.+)";
+
+            //clear style of changed range
+            range.ClearStyle(StringStyle, CommentStyle, NumberStyle, KeywordStyle, FunctionsStyle);
+
+            if(PythonStringRegex1 == null)
+                InitPythonRegex();
+
+            //string highlighting
+            range.SetStyle(StringStyle, PythonStringRegex1);
+            range.SetStyle(StringStyle, PythonStringRegex2);
+
+            //comment highlighting
+            range.SetStyle(CommentStyle, PythonCommentRegex);
+
+            //number highlighting
+            range.SetStyle(NumberStyle, PythonNumberRegex);
+
+            //keyword highlighting
+            range.SetStyle(KeywordStyle, PythonKeywordRegex);
+
+            // Razor highlight
+            range.SetStyle(RazorClassKeywordStyle, RazorClassKeywordRegex);
+            range.SetStyle(RazorPropsKeywordStyle, RazorPropsKeywordRegex);
+            range.SetStyle(RazorFunctionsKeywordStyle, RazorFunctionsKeywordRegex);
+
+            //clear folding markers
+            range.ClearFoldingMarkers();
+        }
+
+        protected void PythonAutoIndentNeeded(object sender, AutoIndentEventArgs args) {
+            //if(Regex.IsMatch(args.LineText, @"\A[^""']*\:\s*\z")) {
+            //    args.ShiftNextLines = args.TabLength;
+            //}
+            if(Regex.IsMatch(args.LineText, @"^[^""']*\:")) {
+                args.ShiftNextLines = args.TabLength;
+            }
+        }
 
         protected void InitJSONRegex()
         {
@@ -1461,6 +1582,16 @@ namespace FastColoredTextBoxNS
         /// </summary>
         public Style TypesStyle { get; set; }
 
+        // Razor style
+        public Style RazorClassKeywordStyle {
+            get; set;
+        }
+        public Style RazorPropsKeywordStyle {
+            get; set;
+        }
+        public Style RazorFunctionsKeywordStyle {
+            get; set;
+        }
         #endregion
     }
 
@@ -1478,6 +1609,8 @@ namespace FastColoredTextBoxNS
         PHP,
         JS,
         Lua,
-        JSON
+        JSON,
+        Python
     }
 }
+

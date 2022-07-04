@@ -1318,8 +1318,10 @@ namespace FastColoredTextBoxNS
             if (tb.LineInfos[Start.iLine].VisibleState != VisibleState.Visible)
                 GoRight(shift);
         }
-
-        public void GoWordRight(bool shift, bool goToStartOfNextWord = false)
+         public void GoWordRight(bool shift){
+             GoWordRight(shift,false);
+         }
+        public void GoWordRight(bool shift, bool goToStartOfNextWord)
         {
             ColumnSelectionMode = false;
 
@@ -1557,8 +1559,11 @@ namespace FastColoredTextBoxNS
 
             return r.ReadOnly;
         }
+         public IEnumerable<Place> GetPlacesCyclic(Place startPlace){
+             return GetPlacesCyclic(startPlace,false);
+         }
 
-        public IEnumerable<Place> GetPlacesCyclic(Place startPlace, bool backward = false)
+        public IEnumerable<Place> GetPlacesCyclic(Place startPlace, bool backward)
         {
             if (backward)
             {
