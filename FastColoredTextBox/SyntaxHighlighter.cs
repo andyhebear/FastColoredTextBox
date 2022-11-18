@@ -131,6 +131,16 @@ namespace FastColoredTextBoxNS
         protected Regex VBKeywordRegex;
         protected Regex VBNumberRegex;
         protected Regex VBStringRegex;
+        //ruby
+        protected Regex RubyStringRegex;
+        protected Regex RubyKeywordRegex;
+        protected Regex RubyNumberRegex;
+        protected Regex RubyFunctionsRegex;
+        protected Regex RubyClassNameRegex;
+        protected Regex RubyAttributeRegex;
+        protected Regex RubyCommentRegex1;
+        protected Regex RubyCommentRegex2;
+        protected Regex RubyCommentRegex3;
 
         protected FastColoredTextBox currentTb;
 
@@ -196,6 +206,9 @@ namespace FastColoredTextBoxNS
                 case Language.Python:
                     PythonSyntaxHighlight(range);
                     break;
+                case Language.Ruby:
+                    RubySyntaxHighlight(range);
+                    break;
                 default:
                     break;
             }
@@ -254,6 +267,9 @@ namespace FastColoredTextBoxNS
                     break;
                 case Language.Python:                    
                     PythonAutoIndentNeeded(sender, args);
+                    break;
+                case Language.Ruby:
+                    RubyAutoIndentNeeded(sender, args);
                     break;
                 default:
                     break;
@@ -722,6 +738,16 @@ namespace FastColoredTextBoxNS
                     StringStyle = BrownStyle;
                     NumberStyle = MagentaStyle;
                     KeywordStyle = BlueStyle;
+                    break;
+                case Language.Ruby:
+                    StringStyle = RedStyle;
+                    CommentStyle = GreenStyle;
+                    NumberStyle = MagentaStyle;
+                    KeywordStyle = BlueBoldStyle;
+                    StatementsStyle = BlueBoldStyle;
+                    FunctionsStyle = MaroonStyle;
+                    VariableStyle = MaroonStyle;
+                    TypesStyle = BrownStyle;
                     break;
             }
         }
@@ -1465,6 +1491,99 @@ namespace FastColoredTextBoxNS
             range.SetFoldingMarkers(@"\[", @"\]"); //allow to collapse comment block
         }
 
+        protected void InitRubyRegex() {
+            
+            RubyStringRegex = new Regex(@"""""|"".*?[^\\]""|'.*?[^\\]'", RegexCompiledOption);
+            RubyCommentRegex1 = new Regex(@"#.*$", RegexOptions.Multiline | RegexCompiledOption);
+            RubyCommentRegex2 = new Regex(@"'''[\s]*[\S]*.*?'''", RegexOptions.Singleline | RegexCompiledOption);
+            //PythonCommentRegex3 = new Regex(@"", RegexOptions.Multiline | RegexCompiledOption);
+            RubyNumberRegex = new Regex(@"\b\d+[\.]?\d*([eE]\-?\d+)?[lLdDfF]?\b|\b0x[a-fA-F\d]+\b",
+                                          RegexCompiledOption);
+            RubyAttributeRegex = new Regex(@"^\s*(?<range>\[.+?\])\s*$", RegexOptions.Multiline | RegexCompiledOption);
+            RubyClassNameRegex = new Regex(@"\b(class|def)\s+(?<range>\w+?)\b", RegexCompiledOption);
+            RubyKeywordRegex = new Regex(
+                    @"\b(operate|except|False|None|True|and|as|assert|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield)\b",
+                    RegexCompiledOption);
+        }
+        public virtual void RubySyntaxHighlight(Range range) {
+            range.tb.CommentPrefix = "#";
+            range.tb.LeftBracket = '(';
+            range.tb.RightBracket = ')';
+            range.tb.LeftBracket2 = '{';
+            range.tb.RightBracket2 = '}';
+            range.tb.BracketsHighlightStrategy = BracketsHighlightStrategy.Strategy2;
+
+            range.tb.AutoIndentCharsPatterns
+                = @"
+^\s*[\w\.]+(\s\w+)?\s*(?<range>=)\s*(?<range>[^;]+);
+^\s*(case|default)\s*[^:]*(?<range>:)\s*(?<range>[^;]+);
+";
+            //clear style of changed range
+            range.ClearStyle(StringStyle, CommentStyle, NumberStyle, AttributeStyle, ClassNameStyle, KeywordStyle);
+            //
+            //if((PythonStringRegex == null))
+            //    InitPythonRegex();
+            if(RubyStringRegex == null) {
+                InitRubyRegex();
+            }
+            //string highlighting
+            range.SetStyle(StringStyle, RubyStringRegex);
+            //comment highlighting
+            range.SetStyle(CommentStyle, RubyCommentRegex1);
+            range.SetStyle(CommentStyle, RubyCommentRegex2);
+            //range.SetStyle(CommentStyle, PythonCommentRegex3);
+            //number highlighting
+            range.SetStyle(NumberStyle, RubyNumberRegex);
+            //attribute highlighting
+            range.SetStyle(AttributeStyle, RubyAttributeRegex);
+            //class name highlighting
+            range.SetStyle(ClassNameStyle, RubyClassNameRegex);
+            //keyword highlighting
+            range.SetStyle(KeywordStyle, RubyKeywordRegex);
+
+            //clear folding markers
+            range.ClearFoldingMarkers();
+            //set folding markers
+            range.SetFoldingMarkers("{", "}"); //allow to collapse brackets block
+            range.SetFoldingMarkers(@"#region\b", @"#endregion\b"); //allow to collapse #region blocks
+            range.SetFoldingMarkers(@"/\*", @"\*/"); //allow to collapse comment block
+        }
+
+        protected void RubyAutoIndentNeeded(object sender, AutoIndentEventArgs args) {
+            //block {}
+            if(Regex.IsMatch(args.LineText, @"^[^""']*\{.*\}[^""']*$"))
+                return;
+            //start of block {}
+            if(Regex.IsMatch(args.LineText, @"^[^""']*\{")) {
+                args.ShiftNextLines = args.TabLength;
+                return;
+            }
+            //end of block {}
+            if(Regex.IsMatch(args.LineText, @"}[^""']*$")) {
+                args.Shift = -args.TabLength;
+                args.ShiftNextLines = -args.TabLength;
+                return;
+            }
+            //label
+            if(Regex.IsMatch(args.LineText, @"^\s*\w+\s*:\s*($|//)") &&
+                !Regex.IsMatch(args.LineText, @"^\s*default\s*:")) {
+                args.Shift = -args.TabLength;
+                return;
+            }
+            //some statements: case, default
+            if(Regex.IsMatch(args.LineText, @"^\s*(case|default)\b.*:\s*($|//)")) {
+                args.Shift = -args.TabLength / 2;
+                return;
+            }
+            //is unclosed operator in previous line ?
+            if(Regex.IsMatch(args.PrevLineText, @"^\s*(if|for|foreach|while|[\}\s]*else)\b[^{]*$"))
+                if(!Regex.IsMatch(args.PrevLineText, @"(;\s*$)|(;\s*//)")) //operator is unclosed
+                {
+                    args.Shift = args.TabLength;
+                    return;
+                }
+        }
+
         #region Styles
 
         /// <summary>
@@ -1610,7 +1729,8 @@ namespace FastColoredTextBoxNS
         JS,
         Lua,
         JSON,
-        Python
+        Python,
+        Ruby
     }
 }
 
